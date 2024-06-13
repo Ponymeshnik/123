@@ -3,18 +3,15 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import requests
 
-# Замените 'YOUR_TELEGRAM_BOT_TOKEN' на ваш токен
 TELEGRAM_BOT_TOKEN = '6930378447:AAGJ97xZbLAuOw0oPQPt2RcdXfryQ_cTXuU'
 OPENDOTA_API_URL = 'https://api.opendota.com/api'
 
-# Включаем логирование
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Глобальные словари для хранения имен героев и предметов
 HEROES = {}
 ITEMS = {}
 
@@ -58,7 +55,7 @@ def get_heroes():
         heroes = response.json()
         HEROES = {hero['localized_name'].lower(): hero for hero in heroes}
     else:
-        logger.error('Failed to fetch heroes from OpenDota API')
+        logger.error('Не удалось получить героев из API OpenDota')
 
 def get_items():
     global ITEMS
@@ -67,7 +64,7 @@ def get_items():
         items = response.json()
         ITEMS = {str(item['id']): item['dname'] for item in items.values() if 'id' in item and 'dname' in item}
     else:
-        logger.error('Failed to fetch items from OpenDota API')
+        logger.error('Не удалось получить элементы из API OpenDota')
 
 def get_last_matches(player_id: str, num_matches: int = 5):
     response = requests.get(f'{OPENDOTA_API_URL}/players/{player_id}/recentMatches')
@@ -76,9 +73,9 @@ def get_last_matches(player_id: str, num_matches: int = 5):
         if matches:
             return matches[:num_matches]
         else:
-            return 'No matches found for this player.'
+            return 'Для этого игрока не найдено ни одного совпадения.'
     else:
-        return 'Error fetching data from OpenDota API.'
+        return 'Ошибка при получении данных из API OpenDota.'
 
 def get_match_details(match_id: int):
     response = requests.get(f'{OPENDOTA_API_URL}/matches/{match_id}')
@@ -126,7 +123,7 @@ def get_top_heroes(player_id: str):
     if response.status_code == 200:
         return response.json()
     else:
-        return 'Error fetching data from OpenDota API.'
+        return 'Ошибка при получении данных из API OpenDota.'
 
 async def topheroes_pickrate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     player_id = context.user_data.get('player_id')
@@ -182,7 +179,7 @@ def get_hero_stats(hero_name: str):
                 return hero
         return 'Герой не найден.'
     else:
-        return 'Error fetching data from OpenDota API.'
+        return 'Ошибка при получении данных из API OpenDota.'
 
 def get_hero_items(hero_id: int):
     response = requests.get(f'{OPENDOTA_API_URL}/heroes/{hero_id}/itemPopularity')
@@ -190,7 +187,7 @@ def get_hero_items(hero_id: int):
         return response.json()
     else:
         logger.error(f'Error fetching hero items for hero ID {hero_id}: {response.status_code}')
-        return 'Error fetching data from OpenDota API.'
+        return 'Ошибка при получении данных из API OpenDota.'
 
 async def herostats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text('Пожалуйста, введите имя героя:')
@@ -214,13 +211,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             if isinstance(hero_stats, str):
                 await update.message.reply_text(hero_stats)
                 return
-
-            # Отладочная печать для проверки структуры данных
             logger.info(f"Данные статистики героя: {hero_stats}")
-
-            # Calculate total_pro_pick with a check for 'pro_pick'
             total_pro_pick = sum(hero.get('pro_pick', 0) for hero in HEROES.values())
-
             message = (
                 f"Герой: {hero_stats['localized_name']}\n"
                 f"Winrate: {hero_stats['pro_win'] / hero_stats.get('pro_pick', 1) * 100:.2f}%\n"
@@ -235,13 +227,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
             else:
                 message += "Средняя статистика (убийства, смерти, помощи) недоступна.\n"
-
-            # Calculations for overall health, armor, and mana
             overall_health = hero_stats['base_health'] + (hero_stats['base_str'] * 22)
             overall_armor = hero_stats['base_armor'] + (hero_stats['base_agi'] * 0.17)
             overall_mana = hero_stats['base_mana'] + (hero_stats['base_int'] * 12)
 
-            # Добавление характеристик героя
             message += (
                 f"ID: {hero_stats['id']}\n"
                 f"Primary Attribute: {hero_stats['primary_attr']}\n"
@@ -315,7 +304,6 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await request_player_id(update, context)
 
 def main() -> None:
-    # Получаем информацию о героях и предметах при запуске бота
     get_heroes()
     get_items()
 
