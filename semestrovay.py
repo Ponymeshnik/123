@@ -2,9 +2,11 @@ import logging
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import requests
+from bs4 import BeautifulSoup
 
 TELEGRAM_BOT_TOKEN = '6930378447:AAGJ97xZbLAuOw0oPQPt2RcdXfryQ_cTXuU'
 OPENDOTA_API_URL = 'https://api.opendota.com/api'
+url = 'https://dota2.ru/news/'
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -303,6 +305,49 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await request_player_id(update, context)
 
+
+def fetch_news(max_news=3):
+    url = 'https://dota2.ru/news/'
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        news_items = soup.find_all('li', class_='index__news-item')
+
+        if not news_items:
+            return "Не удалось найти элементы новостей. Проверьте структуру HTML страницы."
+
+        news_list = []
+        for item in news_items[:max_news]:  # Ограничиваем количество новостей
+            link_tag = item.find('a', class_='index__news-link')
+            title_tag = item.find('div', class_='index__news-name')
+            date_tag = item.find('div', class_='index__news-stat')
+
+            if title_tag and link_tag and date_tag:
+                title = title_tag.text.strip()
+                link = f"https://dota2.ru{link_tag['href']}"
+                date = date_tag.text.strip()
+                news_list.append({'title': title, 'link': link, 'date': date})
+
+        news_text = ""
+        for news in news_list:
+            news_text += f"Title: {news['title']}\n"
+            news_text += f"Link: {news['link']}\n"
+            news_text += f"Date: {news['date']}\n"
+            news_text += '-' * 40 + '\n'
+
+        return news_text
+
+    except requests.RequestException as e:
+        return f"Ошибка запроса: {e}"
+    except Exception as e:
+        return f"Произошла ошибка: {e}"
+
+async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    news_text = fetch_news()
+    await update.message.reply_text(news_text)
+
+
 def main() -> None:
     get_heroes()
     get_items()
@@ -315,6 +360,7 @@ def main() -> None:
     application.add_handler(CommandHandler("topheroes_winrate", topheroes_winrate))
     application.add_handler(CommandHandler("herostats", herostats))
     application.add_handler(CommandHandler("heroitems", heroitems))
+    application.add_handler(CommandHandler("news", news))
     application.add_handler(CommandHandler("back", back))
     application.add_handler(MessageHandler(filters.Regex('^Ввести Player ID$'), request_player_id))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
